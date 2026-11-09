@@ -1277,43 +1277,178 @@ def render_calculator_page(page_data, is_home=False):
 </body>
 </html>"""
 
-    with open(os.path.join(OUTPUT_DIR, "index.html"), "w", encoding="utf-8") as f:
-        f.write(render_calculator_page(home_preset, is_home=True))
-    generated_urls.append(f"{BASE_URL}/")
+def render_single_review_page(rev):
+    amz_link = amz_url(rev["keyword"])
+    pros_html = "".join([f'<li class="text-sm text-gray-800 mb-1.5">✅ {p}</li>' for p in rev["pros"]])
+    cons_html = "".join([f'<li class="text-sm text-gray-800 mb-1.5">⚠️ {c}</li>' for c in rev["cons"]])
+    paras_html = "".join([f'<p class="text-sm sm:text-base text-gray-800 leading-relaxed mb-4">{p}</p>' for p in rev["body_paragraphs"]])
 
-    # 2. Generate Dedicated HTML Site Map Page (sitemap.html)
-    with open(os.path.join(OUTPUT_DIR, "sitemap.html"), "w", encoding="utf-8") as f:
-        f.write(render_dedicated_html_sitemap_page())
-    generated_urls.append(f"{BASE_URL}/sitemap.html")
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{rev['title']} | {SITE_NAME}</title>
+    <meta name="description" content="{rev['summary']}">
+    <meta name="robots" content="index, follow">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-200 text-gray-900 antialiased">
+    {render_common_header_and_banner()}
+    <main class="max-w-4xl mx-auto px-4 py-10 space-y-6">
+        <nav class="text-xs font-semibold text-gray-600 flex items-center gap-2">
+            <a href="{BASE_URL}/" class="hover:text-blue-800">Home</a>
+            <span>/</span>
+            <a href="{BASE_URL}/#reviews" class="hover:text-blue-800">Reviews</a>
+            <span>/</span>
+            <span class="text-gray-900">{rev['product_name']}</span>
+        </nav>
 
-    # 3. Generate Programmatic Sump Pump & TDH Calculator Pages
-    for page in ALL_CALC_PAGES:
-        filename = f"{page['slug']}.html"
-        with open(os.path.join(OUTPUT_DIR, filename), "w", encoding="utf-8") as f:
-            f.write(render_calculator_page(page, is_home=False))
-        generated_urls.append(f"{BASE_URL}/{filename}")
+        <article class="bg-gray-100 border-2 border-gray-300 rounded-2xl p-6 sm:p-8 shadow-sm space-y-5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="text-xs font-extrabold uppercase tracking-wider bg-blue-100 text-blue-900 border border-blue-300 px-3 py-1 rounded-full">{rev['verdict_badge']}</span>
+                <span class="text-xs font-black bg-emerald-100 text-emerald-950 px-3 py-1 rounded-lg">Score: {rev['rating_score']} / 5.0 ★</span>
+            </div>
+            <div>
+                <span class="text-xs text-gray-600 font-semibold uppercase">{rev['category']}</span>
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900 mt-1 mb-2 leading-snug">{rev['title']}</h1>
+                <p class="text-xs text-gray-500 font-mono">Published: {rev['published_date']}</p>
+            </div>
 
-    # 4. Generate Cumulative Daily Product Review Pages (+3 new reviews unlocked every single day)
-    active_reviews = get_cumulative_product_reviews()
-    for rev in active_reviews:
-        filename = f"{rev['slug']}.html"
-        with open(os.path.join(OUTPUT_DIR, filename), "w", encoding="utf-8") as f:
-            f.write(render_single_review_page(rev))
-        generated_urls.append(f"{BASE_URL}/{filename}")
+            <div class="bg-blue-50 border-l-4 border-blue-700 p-4 rounded-r-lg">
+                <p class="text-sm text-gray-800 font-medium">{rev['summary']}</p>
+            </div>
 
-    # 5. Generate Standalone Head-to-Head Product Comparison Pages
-    for vs in VS_COMPARISONS:
-        filename = f"{vs['slug']}.html"
-        with open(os.path.join(OUTPUT_DIR, filename), "w", encoding="utf-8") as f:
-            f.write(render_vs_comparison_page(vs))
-        generated_urls.append(f"{BASE_URL}/{filename}")
+            <div class="grid grid-cols-2 gap-2 text-xs bg-gray-200 p-4 rounded-xl border border-gray-300">
+                <div><span class="text-gray-500 block">Performance:</span><strong>{rev['spec_1']}</strong></div>
+                <div><span class="text-gray-500 block">Motor:</span><strong>{rev['spec_2']}</strong></div>
+                <div><span class="text-gray-500 block">Switch:</span><strong>{rev['spec_3']}</strong></div>
+                <div><span class="text-gray-500 block">Build:</span><strong>{rev['spec_4']}</strong></div>
+            </div>
 
-    # 6. XML Sitemap, Robots, Pinterest RSS Feed & IndexNow Auto-Ping
-    generate_sitemap_and_robots(generated_urls)
-    generate_pinterest_rss_feed(active_reviews)
-    generated_urls.append(f"{BASE_URL}/feed.xml")
-    ping_indexnow(generated_urls)
-    print(f"Successfully generated {len(generated_urls)} total SEO pages ({len(active_reviews)} cumulative review articles [+3/day] + Pinterest RSS + HTML/XML sitemaps) in /{OUTPUT_DIR}!")
+            <a href="{amz_link}" target="_blank" rel="nofollow sponsored noopener"
+               class="block text-center bg-blue-700 hover:bg-blue-800 text-white font-extrabold text-sm py-3 px-4 rounded-lg transition shadow-sm">
+               Check Today's Price on Amazon &rarr;
+            </a>
+
+            <div>{paras_html}</div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="bg-emerald-50 border border-emerald-300 rounded-xl p-4">
+                    <h3 class="text-sm font-extrabold text-emerald-900 mb-2">PROS</h3>
+                    <ul class="list-none">{pros_html}</ul>
+                </div>
+                <div class="bg-amber-50 border border-amber-300 rounded-xl p-4">
+                    <h3 class="text-sm font-extrabold text-amber-900 mb-2">CONS</h3>
+                    <ul class="list-none">{cons_html}</ul>
+                </div>
+            </div>
+
+            <a href="{amz_link}" target="_blank" rel="nofollow sponsored noopener"
+               class="block text-center bg-gray-800 hover:bg-gray-900 text-white font-extrabold text-sm py-3 px-4 rounded-lg transition">
+               Shop {rev['product_name']} on Amazon &rarr;
+            </a>
+        </article>
+
+        <a href="{BASE_URL}/#reviews" class="inline-block text-sm font-bold text-blue-800 hover:text-blue-900">&larr; Back to all reviews</a>
+    </main>
+    <footer class="bg-gray-300 border-t border-gray-400 mt-16 py-8 px-4 text-xs text-gray-700 text-center">
+        <p class="font-bold text-gray-900">{SITE_NAME} — {SITE_TAGLINE}</p>
+        <p class="mt-1">As an Amazon Associate, this site earns from qualifying purchases (Store ID: {AFFILIATE_TAG}).</p>
+    </footer>
+</body>
+</html>"""
+
+def render_vs_comparison_page(vs):
+    metrics_rows = ""
+    for m in vs["metrics"]:
+        metrics_rows += f"""
+        <tr class="border-b border-gray-300 hover:bg-gray-200/80">
+            <td class="p-3.5 font-bold text-gray-900 text-xs">{m['feature']}</td>
+            <td class="p-3.5 text-xs text-emerald-900 font-semibold">{m['val_a']}</td>
+            <td class="p-3.5 text-xs text-gray-700">{m['val_b']}</td>
+        </tr>
+        """
+
+    link_a = amz_url(vs["keyword_a"])
+    link_b = amz_url(vs["keyword_b"])
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{vs['title']} | {SITE_NAME}</title>
+    <meta name="description" content="{vs['summary']}">
+    <meta name="robots" content="index, follow">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-200 text-gray-900 antialiased">
+    {render_common_header_and_banner()}
+    <main class="max-w-4xl mx-auto px-4 py-10 space-y-6">
+        <nav class="text-xs font-semibold text-gray-600 flex items-center gap-2">
+            <a href="{BASE_URL}/" class="hover:text-blue-800">Home</a>
+            <span>/</span>
+            <a href="{BASE_URL}/#comparison" class="hover:text-blue-800">Comparisons</a>
+            <span>/</span>
+            <span class="text-gray-900">Head-to-Head</span>
+        </nav>
+
+        <article class="bg-gray-100 border-2 border-gray-300 rounded-2xl p-6 sm:p-8 shadow-sm space-y-5">
+            <div class="text-center space-y-2">
+                <span class="inline-block text-xs font-extrabold uppercase tracking-wider bg-blue-100 text-blue-900 border border-blue-300 px-3 py-1 rounded-full">{vs['winner_badge']}</span>
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900 leading-snug">{vs['title']}</h1>
+                <p class="text-sm text-gray-700">{vs['summary']}</p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
+                <div class="bg-emerald-50 border-2 border-emerald-400 rounded-xl p-4">
+                    <span class="text-xs font-extrabold uppercase text-emerald-800">Option A</span>
+                    <h3 class="text-base font-extrabold text-gray-900 mt-1 mb-3">{vs['product_a']}</h3>
+                    <a href="{link_a}" target="_blank" rel="nofollow sponsored noopener"
+                       class="block text-center bg-blue-700 hover:bg-blue-800 text-white font-extrabold text-xs py-2.5 px-3 rounded-lg transition">
+                       Check Option A Price &rarr;
+                    </a>
+                </div>
+                <div class="bg-gray-200 border-2 border-gray-400 rounded-xl p-4">
+                    <span class="text-xs font-extrabold uppercase text-gray-700">Option B</span>
+                    <h3 class="text-base font-extrabold text-gray-900 mt-1 mb-3">{vs['product_b']}</h3>
+                    <a href="{link_b}" target="_blank" rel="nofollow sponsored noopener"
+                       class="block text-center bg-gray-800 hover:bg-gray-900 text-white font-extrabold text-xs py-2.5 px-3 rounded-lg transition">
+                       Check Option B Price &rarr;
+                    </a>
+                </div>
+            </div>
+
+            <div class="bg-gray-100 border-2 border-gray-300 rounded-xl overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-300 border-b-2 border-gray-400 text-[11px] font-extrabold uppercase tracking-wider text-gray-800">
+                            <th class="p-3.5">Feature</th>
+                            <th class="p-3.5 text-emerald-900">A: {vs['product_a'][:35]}...</th>
+                            <th class="p-3.5">B: {vs['product_b'][:35]}...</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {metrics_rows}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="bg-blue-50 border-l-4 border-blue-700 p-5 rounded-r-lg">
+                <h3 class="text-sm font-extrabold text-blue-900 uppercase mb-2">Final Verdict</h3>
+                <p class="text-sm text-gray-800 leading-relaxed">{vs['verdict_text']}</p>
+            </div>
+        </article>
+
+        <a href="{BASE_URL}/#comparison" class="inline-block text-sm font-bold text-blue-800 hover:text-blue-900">&larr; Back to all comparisons</a>
+    </main>
+    <footer class="bg-gray-300 border-t border-gray-400 mt-16 py-8 px-4 text-xs text-gray-700 text-center">
+        <p class="font-bold text-gray-900">{SITE_NAME} — {SITE_TAGLINE}</p>
+        <p class="mt-1">As an Amazon Associate, this site earns from qualifying purchases (Store ID: {AFFILIATE_TAG}).</p>
+    </footer>
+</body>
+</html>"""
 
 def generate_pinterest_rss_feed(reviews):
     now_rfc822 = email.utils.format_datetime(datetime.datetime.now(datetime.timezone.utc))
@@ -1425,6 +1560,50 @@ def ping_indexnow(urls):
             print(f"IndexNow Ping Status: {resp.status}")
     except Exception as e:
         print(f"IndexNow notice: {e}")
+
+def main():
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    generated_urls = []
+    home_preset = SUMP_PRESETS[0]
+
+    # 1. Generate Home Page (index.html)
+    with open(os.path.join(OUTPUT_DIR, "index.html"), "w", encoding="utf-8") as f:
+        f.write(render_calculator_page(home_preset, is_home=True))
+    generated_urls.append(f"{BASE_URL}/")
+
+    # 2. Generate Dedicated HTML Site Map Page (sitemap.html)
+    with open(os.path.join(OUTPUT_DIR, "sitemap.html"), "w", encoding="utf-8") as f:
+        f.write(render_dedicated_html_sitemap_page())
+    generated_urls.append(f"{BASE_URL}/sitemap.html")
+
+    # 3. Generate Programmatic Sump Pump & TDH Calculator Pages
+    for page in ALL_CALC_PAGES:
+        filename = f"{page['slug']}.html"
+        with open(os.path.join(OUTPUT_DIR, filename), "w", encoding="utf-8") as f:
+            f.write(render_calculator_page(page, is_home=False))
+        generated_urls.append(f"{BASE_URL}/{filename}")
+
+    # 4. Generate Cumulative Daily Product Review Pages (+3 new reviews unlocked every single day)
+    active_reviews = get_cumulative_product_reviews()
+    for rev in active_reviews:
+        filename = f"{rev['slug']}.html"
+        with open(os.path.join(OUTPUT_DIR, filename), "w", encoding="utf-8") as f:
+            f.write(render_single_review_page(rev))
+        generated_urls.append(f"{BASE_URL}/{filename}")
+
+    # 5. Generate Standalone Head-to-Head Product Comparison Pages
+    for vs in VS_COMPARISONS:
+        filename = f"{vs['slug']}.html"
+        with open(os.path.join(OUTPUT_DIR, filename), "w", encoding="utf-8") as f:
+            f.write(render_vs_comparison_page(vs))
+        generated_urls.append(f"{BASE_URL}/{filename}")
+
+    # 6. XML Sitemap, Robots, Pinterest RSS Feed & IndexNow Auto-Ping
+    generate_sitemap_and_robots(generated_urls)
+    generate_pinterest_rss_feed(active_reviews)
+    generated_urls.append(f"{BASE_URL}/feed.xml")
+    ping_indexnow(generated_urls)
+    print(f"Successfully generated {len(generated_urls)} total SEO pages ({len(active_reviews)} cumulative review articles [+3/day] + Pinterest RSS + HTML/XML sitemaps) in /{OUTPUT_DIR}!")
 
 if __name__ == "__main__":
     main()
