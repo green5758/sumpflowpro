@@ -1277,228 +1277,103 @@ def render_calculator_page(page_data, is_home=False):
 </body>
 </html>"""
 
-def render_single_review_page(rev):
-    canonical_url = f"{BASE_URL}/{rev['slug']}.html"
-    amz_link = amz_url(rev["keyword"])
+    with open(os.path.join(OUTPUT_DIR, "index.html"), "w", encoding="utf-8") as f:
+        f.write(render_calculator_page(home_preset, is_home=True))
+    generated_urls.append(f"{BASE_URL}/")
 
-    review_schema = {
-        "@context": "https://schema.org",
-        "@type": "Product",
-        "name": rev["product_name"],
-        "description": rev["summary"],
-        "review": {
-            "@type": "Review",
-            "datePublished": rev["published_date"],
-            "reviewRating": {"@type": "Rating", "ratingValue": rev["rating_score"], "bestRating": "5"},
-            "author": {"@type": "Organization", "name": SITE_NAME},
-            "reviewBody": " ".join(rev["body_paragraphs"])
-        }
-    }
+    # 2. Generate Dedicated HTML Site Map Page (sitemap.html)
+    with open(os.path.join(OUTPUT_DIR, "sitemap.html"), "w", encoding="utf-8") as f:
+        f.write(render_dedicated_html_sitemap_page())
+    generated_urls.append(f"{BASE_URL}/sitemap.html")
 
-    pros_html = "".join([f'<li class="flex items-start gap-2 text-sm text-gray-800"><span class="text-emerald-700 font-bold">✓</span><span>{p}</span></li>' for p in rev["pros"]])
-    cons_html = "".join([f'<li class="flex items-start gap-2 text-sm text-gray-800"><span class="text-rose-700 font-bold">✕</span><span>{c}</span></li>' for c in rev["cons"]])
-    paragraphs_html = "".join([f'<p class="text-gray-800 leading-relaxed text-base mb-4">{p}</p>' for p in rev["body_paragraphs"]])
+    # 3. Generate Programmatic Sump Pump & TDH Calculator Pages
+    for page in ALL_CALC_PAGES:
+        filename = f"{page['slug']}.html"
+        with open(os.path.join(OUTPUT_DIR, filename), "w", encoding="utf-8") as f:
+            f.write(render_calculator_page(page, is_home=False))
+        generated_urls.append(f"{BASE_URL}/{filename}")
 
-    recent_reviews = [r for r in get_cumulative_product_reviews() if r["slug"] != rev["slug"]][:6]
-    related_html = ""
-    for other in recent_reviews:
-        related_html += f"""
-        <a href="{BASE_URL}/{other['slug']}.html" class="bg-gray-100 border-2 border-gray-300 rounded-xl p-4 hover:border-blue-700 transition block">
-            <span class="text-[11px] font-bold text-blue-800 uppercase">{other['verdict_badge']}</span>
-            <h4 class="font-extrabold text-sm text-gray-900 mt-1 line-clamp-2">{other['product_name']} Review</h4>
-            <span class="text-xs text-gray-600 mt-1 block">Score: {other['rating_score']} / 5.0 ★ ({other['published_date']}) &rarr;</span>
-        </a>
-        """
+    # 4. Generate Cumulative Daily Product Review Pages (+3 new reviews unlocked every single day)
+    active_reviews = get_cumulative_product_reviews()
+    for rev in active_reviews:
+        filename = f"{rev['slug']}.html"
+        with open(os.path.join(OUTPUT_DIR, filename), "w", encoding="utf-8") as f:
+            f.write(render_single_review_page(rev))
+        generated_urls.append(f"{BASE_URL}/{filename}")
 
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{rev['title']} | {SITE_NAME}</title>
-    <meta name="description" content="{rev['summary']}">
-    <link rel="canonical" href="{canonical_url}">
-    <meta name="robots" content="index, follow">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script type="application/ld+json">{json.dumps(review_schema)}</script>
-</head>
-<body class="bg-gray-200 text-gray-900 antialiased">
+    # 5. Generate Standalone Head-to-Head Product Comparison Pages
+    for vs in VS_COMPARISONS:
+        filename = f"{vs['slug']}.html"
+        with open(os.path.join(OUTPUT_DIR, filename), "w", encoding="utf-8") as f:
+            f.write(render_vs_comparison_page(vs))
+        generated_urls.append(f"{BASE_URL}/{filename}")
 
-    {render_common_header_and_banner()}
+    # 6. XML Sitemap, Robots, Pinterest RSS Feed & IndexNow Auto-Ping
+    generate_sitemap_and_robots(generated_urls)
+    generate_pinterest_rss_feed(active_reviews)
+    generated_urls.append(f"{BASE_URL}/feed.xml")
+    ping_indexnow(generated_urls)
+    print(f"Successfully generated {len(generated_urls)} total SEO pages ({len(active_reviews)} cumulative review articles [+3/day] + Pinterest RSS + HTML/XML sitemaps) in /{OUTPUT_DIR}!")
 
-    <main class="max-w-4xl mx-auto px-4 py-10 space-y-10">
-        <nav class="text-xs font-semibold text-gray-600 flex items-center gap-2">
-            <a href="{BASE_URL}/" class="hover:text-blue-800">Home & Thrust Calculator</a>
-            <span>/</span>
-            <a href="{BASE_URL}/#reviews" class="hover:text-blue-800">Daily Marine Reviews</a>
-            <span>/</span>
-            <span class="text-gray-900">{rev['product_name']}</span>
-        </nav>
+def generate_pinterest_rss_feed(reviews):
+    now_rfc822 = email.utils.format_datetime(datetime.datetime.now(datetime.timezone.utc))
+    items_xml = ""
 
-        <div class="bg-gray-100 border-2 border-gray-300 rounded-2xl p-6 sm:p-8 shadow-sm space-y-5">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-                <span class="text-xs font-extrabold uppercase tracking-wider bg-blue-100 text-blue-900 border border-blue-300 px-3 py-1 rounded-full">{rev['verdict_badge']}</span>
-                <div class="flex items-center gap-2">
-                    <span class="text-xs font-mono text-gray-600">Published: {rev['published_date']}</span>
-                    <span class="text-sm font-black bg-amber-200 text-amber-950 px-3 py-1 rounded-lg">Marine Rating: {rev['rating_score']} / 5.0 ★</span>
-                </div>
-            </div>
-            <h1 class="text-2xl sm:text-4xl font-extrabold text-gray-900 leading-tight">{rev['title']}</h1>
-            <p class="text-base text-gray-700 leading-relaxed">{rev['summary']}</p>
+    for idx, rev in enumerate(reviews[:30]):
+        article_url = f"{BASE_URL}/{rev['slug']}.html"
+        try:
+            dt_obj = datetime.datetime.strptime(rev["published_date"], "%Y-%m-%d").replace(
+                hour=6, minute=(idx % 60), second=0, tzinfo=datetime.timezone.utc
+            )
+            pub_date_rfc = email.utils.format_datetime(dt_obj)
+        except Exception:
+            pub_date_rfc = now_rfc822
 
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-200 p-4 rounded-xl border border-gray-300 text-xs">
-                <div><span class="text-gray-500 block font-medium">Thrust / Spec</span><strong class="text-gray-900">{rev['spec_1']}</strong></div>
-                <div><span class="text-gray-500 block font-medium">GPS / Tech</span><strong class="text-gray-900">{rev['spec_2']}</strong></div>
-                <div><span class="text-gray-500 block font-medium">Shaft / Build</span><strong class="text-gray-900">{rev['spec_3']}</strong></div>
-                <div><span class="text-gray-500 block font-medium">Included</span><strong class="text-gray-900">{rev['spec_4']}</strong></div>
-            </div>
+        pin_headline = f"{rev['product_name']}\nRating: {rev['rating_score']}/5.0 Stars\n{rev['spec_1']}\nRead Review & Calculator"
+        encoded_pin_text = urllib.parse.quote(pin_headline)
+        pin_image_url = f"https://placehold.co/1000x1500/1f2937/38bdf8.png?text={encoded_pin_text}&font=montserrat"
 
-            <div class="flex flex-col sm:flex-row gap-3 pt-2">
-                <a href="{amz_link}" target="_blank" rel="nofollow sponsored noopener"
-                   class="flex-1 text-center bg-blue-700 hover:bg-blue-800 text-white font-extrabold text-sm py-3.5 px-6 rounded-xl transition shadow-sm">
-                   Check Latest Price & Availability on Amazon &rarr;
-                </a>
-                <a href="{BASE_URL}/#calculator"
-                   class="text-center bg-gray-300 hover:bg-gray-400 text-gray-900 font-bold text-sm py-3.5 px-5 rounded-xl transition">
-                   Calculate Boat Thrust & Shaft
-                </a>
-            </div>
-        </div>
+        clean_title = (
+            rev["title"]
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+        )
+        clean_desc = (
+            f"{rev['summary']} Key Specs: {rev['spec_1']} | {rev['spec_2']} | {rev['spec_3']}. "
+            f"Use our free interactive basement sump pump GPH and TDH calculator on {SITE_NAME}."
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        )
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="bg-gray-100 border-2 border-emerald-400 rounded-2xl p-6 space-y-3">
-                <h2 class="text-base font-extrabold text-emerald-900 uppercase tracking-wide">Pros (What We Like)</h2>
-                <ul class="space-y-2.5">{pros_html}</ul>
-            </div>
-            <div class="bg-gray-100 border-2 border-rose-400 rounded-2xl p-6 space-y-3">
-                <h2 class="text-base font-extrabold text-rose-900 uppercase tracking-wide">Cons (Things to Consider)</h2>
-                <ul class="space-y-2.5">{cons_html}</ul>
-            </div>
-        </div>
+        items_xml += f"""    <item>
+      <title>{clean_title}</title>
+      <link>{article_url}</link>
+      <guid isPermaLink="true">{article_url}</guid>
+      <pubDate>{pub_date_rfc}</pubDate>
+      <description>{clean_desc}</description>
+      <enclosure url="{pin_image_url}" length="150000" type="image/png" />
+      <media:content url="{pin_image_url}" type="image/png" medium="image" width="1000" height="1500" />
+    </item>\n"""
 
-        <article class="bg-gray-100 border-2 border-gray-300 rounded-2xl p-6 sm:p-8 space-y-4">
-            <h2 class="text-xl font-extrabold text-gray-900 border-b border-gray-300 pb-3">Hands-On Spot-Lock Wind Hold, Amp Draw & Sonar Analysis</h2>
-            {paragraphs_html}
-            <div class="pt-4 border-t border-gray-300 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div>
-                    <span class="text-xs font-bold uppercase text-blue-800 block">Final Verdict</span>
-                    <p class="text-sm font-bold text-gray-900">{rev['product_name']} earns {rev['rating_score']}/5.0 in our on-water marine benchmark.</p>
-                </div>
-                <a href="{amz_link}" target="_blank" rel="nofollow sponsored noopener"
-                   class="shrink-0 bg-blue-700 hover:bg-blue-800 text-white font-extrabold text-sm px-6 py-3 rounded-xl transition shadow-sm">
-                   View Customer Reviews & Price on Amazon &rarr;
-                </a>
-            </div>
-        </article>
+    rss_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+     xmlns:media="http://search.yahoo.com/mrss/"
+     xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>{SITE_NAME} — {SITE_TAGLINE}</title>
+    <link>{BASE_URL}/</link>
+    <description>Daily sump pump reviews, TDH friction charts, and battery backup guides on {SITE_NAME}.</description>
+    <language>en-us</language>
+    <lastBuildDate>{now_rfc822}</lastBuildDate>
+    <atom:link href="{BASE_URL}/feed.xml" rel="self" type="application/rss+xml" />
+{items_xml}  </channel>
+</rss>"""
 
-        <section class="space-y-4">
-            <h3 class="text-lg font-extrabold text-gray-900">Recent Daily Marine & Trolling Reviews (+3 Added Daily)</h3>
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {related_html}
-            </div>
-        </section>
-    </main>
-
-    <footer class="bg-gray-300 border-t border-gray-400 mt-16 py-10 px-4 text-xs text-gray-700 text-center">
-        <p class="font-bold text-gray-900">{SITE_NAME} — {SITE_TAGLINE}</p>
-        <p class="mt-1">As an Amazon Associate, this site earns from qualifying purchases (Store ID: {AFFILIATE_TAG}).</p>
-    </footer>
-</body>
-</html>"""
-
-def render_vs_comparison_page(vs):
-    canonical_url = f"{BASE_URL}/{vs['slug']}.html"
-    link_a = amz_url(vs["keyword_a"])
-    link_b = amz_url(vs["keyword_b"])
-
-    rows_html = ""
-    for m in vs["metrics"]:
-        rows_html += f"""
-        <tr class="border-b border-gray-300">
-            <td class="p-4 font-bold text-gray-900 bg-gray-200 text-xs sm:text-sm w-1/4">{m['feature']}</td>
-            <td class="p-4 text-xs sm:text-sm text-gray-800 w-3/8">{m['val_a']}</td>
-            <td class="p-4 text-xs sm:text-sm text-gray-800 w-3/8">{m['val_b']}</td>
-        </tr>
-        """
-
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{vs['title']} | {SITE_NAME}</title>
-    <meta name="description" content="{vs['summary']}">
-    <link rel="canonical" href="{canonical_url}">
-    <meta name="robots" content="index, follow">
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-200 text-gray-900 antialiased">
-
-    {render_common_header_and_banner()}
-
-    <main class="max-w-4xl mx-auto px-4 py-10 space-y-10">
-        <nav class="text-xs font-semibold text-gray-600 flex items-center gap-2">
-            <a href="{BASE_URL}/" class="hover:text-blue-800">Home & Thrust Calculator</a>
-            <span>/</span>
-            <a href="{BASE_URL}/#comparison" class="hover:text-blue-800">Product Comparisons</a>
-            <span>/</span>
-            <span class="text-gray-900">{vs['product_a']} vs. {vs['product_b']}</span>
-        </nav>
-
-        <div class="bg-gray-100 border-2 border-gray-300 rounded-2xl p-6 sm:p-8 shadow-sm space-y-4">
-            <span class="text-xs font-extrabold uppercase tracking-wider bg-blue-100 text-blue-900 border border-blue-300 px-3 py-1 rounded-full">{vs['winner_badge']}</span>
-            <h1 class="text-2xl sm:text-4xl font-extrabold text-gray-900 leading-tight">{vs['title']}</h1>
-            <p class="text-base text-gray-700 leading-relaxed">{vs['summary']}</p>
-        </div>
-
-        <div class="bg-gray-100 border-2 border-gray-300 rounded-2xl overflow-hidden shadow-sm">
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="bg-gray-800 text-white text-xs sm:text-sm font-extrabold">
-                        <th class="p-4">Specification</th>
-                        <th class="p-4 text-blue-300">{vs['product_a']}</th>
-                        <th class="p-4 text-amber-300">{vs['product_b']}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows_html}
-                    <tr class="bg-gray-200">
-                        <td class="p-4 font-extrabold text-xs sm:text-sm text-gray-900">Check Amazon Price</td>
-                        <td class="p-4">
-                            <a href="{link_a}" target="_blank" rel="nofollow sponsored noopener" class="inline-block bg-blue-700 hover:bg-blue-800 text-white font-extrabold text-xs py-2.5 px-4 rounded-lg transition">
-                                View {vs['product_a']} &rarr;
-                            </a>
-                        </td>
-                        <td class="p-4">
-                            <a href="{link_b}" target="_blank" rel="nofollow sponsored noopener" class="inline-block bg-gray-800 hover:bg-gray-900 text-white font-extrabold text-xs py-2.5 px-4 rounded-lg transition">
-                                View {vs['product_b']} &rarr;
-                            </a>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="bg-gray-100 border-2 border-blue-600 rounded-2xl p-6 sm:p-8 space-y-4">
-            <h2 class="text-xl font-extrabold text-gray-900">Head-to-Head Buying Verdict</h2>
-            <p class="text-sm sm:text-base text-gray-800 leading-relaxed">{vs['verdict_text']}</p>
-            <div class="flex flex-col sm:flex-row gap-3 pt-2">
-                <a href="{link_a}" target="_blank" rel="nofollow sponsored noopener" class="flex-1 text-center bg-blue-700 hover:bg-blue-800 text-white font-extrabold text-sm py-3 px-4 rounded-xl transition">
-                    Shop {vs['product_a']} on Amazon &rarr;
-                </a>
-                <a href="{link_b}" target="_blank" rel="nofollow sponsored noopener" class="flex-1 text-center bg-gray-800 hover:bg-gray-900 text-white font-extrabold text-sm py-3 px-4 rounded-xl transition">
-                    Shop {vs['product_b']} on Amazon &rarr;
-                </a>
-            </div>
-        </div>
-    </main>
-
-    <footer class="bg-gray-300 border-t border-gray-400 mt-16 py-10 px-4 text-xs text-gray-700 text-center">
-        <p class="font-bold text-gray-900">{SITE_NAME} — {SITE_TAGLINE}</p>
-        <p class="mt-1">As an Amazon Associate, this site earns from qualifying purchases (Store ID: {AFFILIATE_TAG}).</p>
-    </footer>
-</body>
-</html>"""
+    with open(os.path.join(OUTPUT_DIR, "feed.xml"), "w", encoding="utf-8") as f:
+        f.write(rss_content)
 
 def generate_sitemap_and_robots(urls):
     today = datetime.datetime.utcnow().strftime("%Y-%m-%d")
@@ -1550,123 +1425,6 @@ def ping_indexnow(urls):
             print(f"IndexNow Ping Status: {resp.status}")
     except Exception as e:
         print(f"IndexNow notice: {e}")
-
-def generate_pinterest_rss_feed(reviews):
-    now_rfc822 = email.utils.format_datetime(datetime.datetime.now(datetime.timezone.utc))
-    items_xml = ""
-
-    def xml_safe(text):
-        if not text:
-            return ""
-        return (str(text)
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace('"', "&quot;")
-                .replace("'", "&apos;"))
-
-    for idx, rev in enumerate(reviews[:30]):
-        article_url = f"{BASE_URL}/{rev['slug']}.html"
-        try:
-            dt_obj = datetime.datetime.strptime(rev["published_date"], "%Y-%m-%d").replace(
-                hour=6, minute=(idx % 60), second=0, tzinfo=datetime.timezone.utc
-            )
-            pub_date_rfc = email.utils.format_datetime(dt_obj)
-        except Exception:
-            pub_date_rfc = now_rfc822
-
-        pin_headline = f"{rev['product_name']}\nRating: {rev['rating_score']}/5.0 Stars\n{rev['spec_1']}\nRead Review & Calculator"
-        encoded_pin_text = urllib.parse.quote(pin_headline)
-        pin_image_url = f"https://placehold.co/1000x1500/1f2937/38bdf8.png?text={encoded_pin_text}&font=montserrat"
-
-        safe_title = xml_safe(rev["title"])
-        safe_url = xml_safe(article_url)
-        safe_desc = xml_safe(f"{rev['summary']} Key Specs: {rev['spec_1']} | {rev['spec_2']} | {rev['spec_3']}. Use our free interactive basement sump pump GPH and TDH calculator on {SITE_NAME}.")
-        safe_img_url = xml_safe(pin_image_url)
-
-        items_xml += f"""    <item>
-      <title>{safe_title}</title>
-      <link>{safe_url}</link>
-      <guid isPermaLink="true">{safe_url}</guid>
-      <pubDate>{pub_date_rfc}</pubDate>
-      <description>{safe_desc}</description>
-      <enclosure url="{safe_img_url}" length="150000" type="image/png" />
-      <media:content url="{safe_img_url}" type="image/png" medium="image" width="1000" height="1500" />
-    </item>\n"""
-
-    safe_site_name = xml_safe(SITE_NAME)
-    safe_site_tagline = xml_safe(SITE_TAGLINE)
-    safe_base_url = xml_safe(BASE_URL)
-
-    rss_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0"
-     xmlns:media="http://search.yahoo.com/mrss/"
-     xmlns:atom="http://www.w3.org/2005/Atom">
-  <channel>
-    <title>{safe_site_name} — {safe_site_tagline}</title>
-    <link>{safe_base_url}/</link>
-    <description>Daily sump pump reviews, TDH friction charts, and battery backup guides on {safe_site_name}.</description>
-    <language>en-us</language>
-    <lastBuildDate>{now_rfc822}</lastBuildDate>
-    <atom:link href="{safe_base_url}/feed.xml" rel="self" type="application/rss+xml" />
-{items_xml}  </channel>
-</rss>"""
-
-    with open(os.path.join(OUTPUT_DIR, "feed.xml"), "w", encoding="utf-8") as f:
-        f.write(rss_content)
-
-def main():
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    generated_urls = []
-
-    # 1. Generate Homepage
-    home_preset = {
-        "slug": "index",
-        "name": "18'–19' Bass Boat (3,200 Lbs Loaded / 22\" Bow Height)",
-        "boat_lbs": 3200,
-        "bow_in": 22,
-        "wind_cond": "1.25",
-        "hours": 8,
-        "mount": "bow",
-        "desc": "Calculate exact boat trolling motor thrust (55/80/112 lbs), system voltage (12V/24V/36V), bow-to-waterline shaft length (36\" to 72\"), and marine LiFePO4 battery capacity—plus read 3 new marine reviews added daily."
-    }
-    with open(os.path.join(OUTPUT_DIR, "index.html"), "w", encoding="utf-8") as f:
-        f.write(render_calculator_page(home_preset, is_home=True))
-    generated_urls.append(f"{BASE_URL}/")
-
-    # 2. Generate Dedicated HTML Site Map Page (sitemap.html)
-    with open(os.path.join(OUTPUT_DIR, "sitemap.html"), "w", encoding="utf-8") as f:
-        f.write(render_dedicated_html_sitemap_page())
-    generated_urls.append(f"{BASE_URL}/sitemap.html")
-
-    # 3. Generate Programmatic Boat & Trolling Motor Calculator Pages
-    for page in ALL_CALC_PAGES:
-        filename = f"{page['slug']}.html"
-        with open(os.path.join(OUTPUT_DIR, filename), "w", encoding="utf-8") as f:
-            f.write(render_calculator_page(page, is_home=False))
-        generated_urls.append(f"{BASE_URL}/{filename}")
-
-    # 4. Generate Cumulative Daily Product Review Pages (+3 new reviews unlocked every single day)
-    active_reviews = get_cumulative_product_reviews()
-    for rev in active_reviews:
-        filename = f"{rev['slug']}.html"
-        with open(os.path.join(OUTPUT_DIR, filename), "w", encoding="utf-8") as f:
-            f.write(render_single_review_page(rev))
-        generated_urls.append(f"{BASE_URL}/{filename}")
-
-    # 5. Generate Standalone Head-to-Head Product Comparison Pages
-    for vs in VS_COMPARISONS:
-        filename = f"{vs['slug']}.html"
-        with open(os.path.join(OUTPUT_DIR, filename), "w", encoding="utf-8") as f:
-            f.write(render_vs_comparison_page(vs))
-        generated_urls.append(f"{BASE_URL}/{filename}")
-
-    # 6. XML Sitemap, Robots, Pinterest RSS Feed & IndexNow Auto-Ping
-    generate_sitemap_and_robots(generated_urls)
-    generate_pinterest_rss_feed(active_reviews)
-    generated_urls.append(f"{BASE_URL}/feed.xml")
-    ping_indexnow(generated_urls)
-    print(f"Successfully generated {len(generated_urls)} total SEO pages ({len(active_reviews)} cumulative review articles [+3/day] + Pinterest RSS + HTML/XML sitemaps) in /{OUTPUT_DIR}!")
 
 if __name__ == "__main__":
     main()
